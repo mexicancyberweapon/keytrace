@@ -1,0 +1,185 @@
+{
+  "description": "Synthetic development fixtures; positive labels simulate credentials, all literal values are invented and invalid. Not held-out research evidence.",
+  "cases": [
+    {
+      "id": "direct_auth",
+      "path": "direct_auth.py",
+      "line": 2,
+      "is_secret": true,
+      "purpose": "authentication",
+      "representation": "assignment",
+      "split": "development"
+    },
+    {
+      "id": "header_alias",
+      "path": "header_alias.py",
+      "line": 2,
+      "is_secret": true,
+      "purpose": "authentication",
+      "representation": "dictionary",
+      "split": "development"
+    },
+    {
+      "id": "function_argument",
+      "path": "function_argument.py",
+      "line": 4,
+      "is_secret": true,
+      "purpose": "authentication",
+      "representation": "function",
+      "split": "development"
+    },
+    {
+      "id": "function_return",
+      "path": "function_return.py",
+      "line": 4,
+      "is_secret": true,
+      "purpose": "authentication",
+      "representation": "return",
+      "split": "development"
+    },
+    {
+      "id": "fstring",
+      "path": "fstring.py",
+      "line": 2,
+      "is_secret": true,
+      "purpose": "authentication",
+      "representation": "string",
+      "split": "development"
+    },
+    {
+      "id": "db_password",
+      "path": "db_password.py",
+      "line": 2,
+      "is_secret": true,
+      "purpose": "database",
+      "representation": "assignment",
+      "split": "development"
+    },
+    {
+      "id": "hmac_key",
+      "path": "hmac_key.py",
+      "line": 2,
+      "is_secret": true,
+      "purpose": "cryptographic_key",
+      "representation": "assignment",
+      "split": "development"
+    },
+    {
+      "id": "api_header",
+      "path": "api_header.py",
+      "line": 2,
+      "is_secret": true,
+      "purpose": "api_token",
+      "representation": "dictionary",
+      "split": "development"
+    },
+    {
+      "id": "unused_secret",
+      "path": "unused_secret.py",
+      "line": 1,
+      "is_secret": true,
+      "purpose": "api_token",
+      "representation": "no_sink",
+      "split": "development"
+    },
+    {
+      "id": "neutral_name",
+      "path": "neutral_name.py",
+      "line": 2,
+      "is_secret": true,
+      "purpose": "authentication",
+      "representation": "neutral_name",
+      "split": "development"
+    },
+    {
+      "id": "test_fixture",
+      "path": "test_fixture.py",
+      "line": 2,
+      "is_secret": false,
+      "purpose": "test_example",
+      "representation": "example",
+      "split": "development"
+    },
+    {
+      "id": "url_only",
+      "path": "url_only.py",
+      "line": 2,
+      "is_secret": false,
+      "purpose": "non_secret",
+      "representation": "benign_argument",
+      "split": "development"
+    },
+    {
+      "id": "reassigned",
+      "path": "reassigned.py",
+      "line": 2,
+      "is_secret": false,
+      "purpose": "non_secret",
+      "representation": "reassignment",
+      "split": "development"
+    },
+    {
+      "id": "uncalled_example",
+      "path": "uncalled_example.py",
+      "line": 3,
+      "is_secret": false,
+      "purpose": "test_example",
+      "representation": "uncalled",
+      "split": "development"
+    },
+    {
+      "id": "ordinary_string",
+      "path": "ordinary_string.py",
+      "line": 1,
+      "is_secret": false,
+      "purpose": "non_secret",
+      "representation": "neutral_name",
+      "split": "development"
+    },
+    {
+      "id": "benign_header",
+      "path": "benign_header.py",
+      "line": 2,
+      "is_secret": false,
+      "purpose": "non_secret",
+      "representation": "dictionary",
+      "split": "development"
+    },
+    {
+      "id": "keyword_call",
+      "path": "keyword_call.py",
+      "line": 4,
+      "is_secret": true,
+      "purpose": "authentication",
+      "representation": "function",
+      "split": "development"
+    },
+    {
+      "id": "dict_clear",
+      "path": "dict_clear.py",
+      "line": 2,
+      "is_secret": false,
+      "purpose": "non_secret",
+      "representation": "reassignment",
+      "split": "development"
+    },
+    {
+      "id": "shadowed_local",
+      "path": "shadowed_local.py",
+      "line": 2,
+      "is_secret": false,
+      "purpose": "non_secret",
+      "representation": "scope",
+      "split": "development"
+    },
+    {
+      "id": "test_db",
+      "path": "test_db.py",
+      "line": 2,
+      "is_secret": false,
+      "purpose": "test_example",
+      "representation": "example",
+      "split": "development"
+    }
+  ]
+}
