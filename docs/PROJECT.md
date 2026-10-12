@@ -2,7 +2,6 @@
 
 - **Name:** Keytrace
 - **Repository:** https://github.com/mexicancyberweapon/keytrace
-- **Environment:** Parrot OS/Linux, working directory previously `~/keytrace`
 - **Course:** CSE 467 — Data & Information Security
 - **Team:** Liam Nolan, Rogelio Corrales, Vansh Sinha, Colin Murnane, Cooper Lake
 - **Starting language:** Python. Other languages are possible future work.
