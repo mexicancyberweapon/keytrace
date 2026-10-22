@@ -1,329 +1,273 @@
-# KeyTrace: Intermediate Report
+# KeyTrace Intermediate Report
 
-**CSE 467 — Data & Information Security**  
-**Team:** Liam Nolan, Rogelio Corrales, Vansh Sinha, Colin Murnane, Cooper Lake  
-**Draft date:** October 11, 2026
+**CSE 467, Data and Information Security**
+
+**Team** Liam Nolan, Rogelio Corrales, Vansh Sinha, Colin Murnane, Cooper Lake
+
+**Draft date** October 11, 2026
 
 ## 1. Objective and progress
 
-KeyTrace investigates whether source code context and static program flow evidence
-can improve secret detection and inference of a credential's intended use. The
-prototype parses Python without executing it, extracts candidate literals, traces
-supported source-to-use paths, and produces redacted findings. A planned LLM stage
-will classify candidates using source context with and without flow information.
+KeyTrace asks whether source code context and program flow can improve secret
+detection and help identify how a credential is used. The prototype parses Python
+without running it. It finds possible credential literals, traces supported paths
+to sensitive uses, and redacts values in its reports. A planned LLM step will
+classify candidates with context alone and with added flow information.
 
-Completed work includes a working static analyzer, two static decision policies,
-20 synthetic development cases, a 423-case obfuscated CredData Python pilot, an
-evaluation pipeline, model request/response interfaces, baseline output importers,
-and 62 passing regression tests. The project has progressed beyond design to an
-implemented and evaluated subsystem. Based on these completed deliverables, the
-project has completed **at least 30% of the planned work**. This is supported by working code, development-data results, and automated
-tests, not a claim that 30% of the research hypothesis has been proven. Actual LLM
-inference, external scanner runs, and held-out experiments remain outstanding.
+So far, the team has built the static analyzer, two decision policies, 20 synthetic
+development cases, a 423 case CredData Python pilot, the evaluation tools, the model
+input and output format, baseline importers, and 62 regression tests. These working
+and tested parts show that the project has completed at least 30% of its planned
+work. Local LLM runs, Gitleaks and TruffleHog runs, held-out testing, and final error
+analysis are still pending.
 
-The current pipeline is:
-
-**Python source → candidate extraction → bounded static analysis → static
-assessment or planned LLM classification → evaluation against labels.**
-
-Evidence for the intermediate milestone is summarized below.
-
-| Work area | Completed evidence |
-|---|---|
-| Core implementation | Python candidate extraction, bounded source-to-use tracing, redacted reporting, and two static decision policies |
-| Data and evaluation | Synthetic development manifest, prepared CredData pilot, scoring pipeline, model request/response contract, and baseline-output normalization |
-| Validation | 62 passing regression tests and recorded preliminary synthetic and CredData metrics |
-| Work still pending | Local-model execution, real Gitleaks/TruffleHog runs, independent held-out evaluation, error analysis, and final reporting |
-
-The two implemented static policies are: (1) **flow**, which predicts a secret when
-a candidate reaches a supported sensitive argument; and (2) **evidence**, which
-assesses credential-like literal contents and names independently of reachability,
-suppresses explicit placeholders/examples, and abstains on ambiguous metadata or
-resource references. A sensitive use is not proof that a credential is live.
-
-The rest of this report maps directly to the requested deliverable: Section 2
-defines the shared experimental design; Sections 3–6 give a complete method and
-results so far for every research question; Section 7 records deviations from the
-initial plan; Section 8 schedules the remaining work; and Appendix B inventories
-the separately delivered codebase, datasets, and logs.
+The flow policy marks a candidate positive when it reaches a supported sensitive
+argument. The evidence policy also considers literal format and variable names. It
+rejects clear placeholders and examples, and returns unknown for unclear metadata
+or file references. Neither policy checks whether a credential is live.
 
 ## 2. Shared experimental design
 
-### Data and experimental units
+### Data
 
-The current development data contains 20 synthetic cases (11 positives, 9 negatives)
-and 423 CredData cases (137 positives, 286 negatives) in 60 Python files from
-three repositories: docker-py, requests-oauthlib, and paramiko. The pilot preserves
-CredData labels: T maps to positive; F and X map to negative. Of 459 original Python
-labels, 30 were excluded for multiple candidates on a line and six for multiline
-candidates. Exclusions were established during import, not according to detection
-success. Synthetic positive values are invented and invalid; they simulate roles.
+The current development data has 20 synthetic cases with 11 positives and 9
+negatives. It also has 423 CredData cases with 137 positives and 286 negatives.
+Those cases come from 60 Python files in docker-py, requests-oauthlib, and paramiko.
+CredData marks T as positive and F or X as negative. The importer excluded 30 labels
+that shared a line with another candidate and 6 multiline labels. The team set these
+rules before scoring the scanner. All synthetic credential values are invented and
+invalid.
 
-A case is a labeled source file/line location. Multiple extracted candidates at
-that location are aggregated to a single prediction. This is line level evaluation,
-not a general span level benchmark. Unmatched external tool findings will be listed
-for review, not automatically counted as false positives. Detection rates apply
-to labeled candidates, not every line of code in the repositories.
+Each case points to one source file and line. If KeyTrace finds several candidates
+on that line, the evaluator combines them into one prediction. The results therefore
+measure labeled lines rather than exact text spans. We will review external tool
+findings that do not match a labeled line instead of counting them as false positives.
 
-For final evaluation, we plan a separate, repository disjoint CredData Python set,
-targeting at least three additional repositories and 200 eligible cases, including
-at least 50 positives and 50 negatives if available. Selection will use language,
-label availability, and repository identity, never scanner success. Record any
-shortfall rather than adjusting the selection after inspecting results. Deduplicate
-source hashes and near identical fixtures across splits. Freeze the manifests,
-exclusions, implementation, prompts, and configurations before inspecting held out
-predictions. Current pilot cases will remain development-only.
+For the final test, we plan to create a separate CredData set from at least three
+more repositories. We will aim for 200 usable cases, including at least 50 positives
+and 50 negatives if the data allows it. We will choose cases by language, available
+labels, and repository. Scanner results will not affect selection. We will also
+remove duplicate or nearly identical files across the development and held-out sets.
+Before viewing final predictions, we will lock the manifests, exclusions, code,
+prompts, and settings.
 
-### Analysis conditions and controls
+### Test conditions
 
-All tools will scan the same filesystem snapshot without online credential
-verification. KeyTrace's primary condition uses explicit `tests` entry points:
-recognized unittest methods and setup are modeled statically. Module-only mode
-will be a separate sensitivity analysis. Unsupported imports, cross-file calls,
-dynamic behavior, and incomplete object analysis can prevent flow recovery.
+All tools will scan the same files without trying credentials online. The main
+KeyTrace condition will enable recognized `unittest` methods and setup code as test
+entry points. A separate run will use module entry points only. Unsupported imports,
+cross-file calls, dynamic behavior, and incomplete object tracking may hide flows.
 
-The planned model will run locally through an Ollama adapter. Select the exact
-model artifact using development only feasibility tests, then record its digest,
-quantization, prompt version, context limit, generation settings, and hardware.
-Use temperature zero where supported and three repeated context/hybrid runs to
-measure residual variability. Model selection and adapter implementation are pending.
+The planned model will run locally through an Ollama adapter. Development tests will
+select the exact model. We will record the model digest, quantization, prompt version,
+context limit, generation settings, and hardware. We will use temperature zero when
+the model supports it and repeat each context and hybrid run three times.
 
-Context and hybrid conditions will use identical extracted candidates, source
-context, model settings, and output schema. Hybrid adds flow traces. For a strict
-flow ablation, analysis warnings must be matched between the two conditions; the
-current exporter adds warnings only in hybrid mode, so this control must be
-implemented before final experiments. Do not interpret the current exporter as a
-completed controlled ablation.
+The context and hybrid tests will use the same candidates, source context, model
+settings, and output format. The hybrid test will add flow traces. The current
+exporter also adds analysis warnings only to the hybrid test. Before final testing,
+we must give both tests the same warnings so that flow is the only difference.
 
-The exporter masks string/bytes contents and removes comments; identifiers and paths
-remain visible. Context includes overlapping top level statements, capped at 12,000
-characters, rather than a minimal program slice. Use the same redaction and context
-budget in both conditions and record truncation. This experiment evaluates reasoning
-from redacted context, not a model's ability to validate original token contents.
-Case identifiers and ground-truth labels must not be included in model messages.
+The exporter replaces string and byte values with `[REDACTED]` and removes comments.
+It keeps identifiers and file paths. Context includes any top-level statement that
+overlaps the selected line, up to 12,000 characters. We will use the same redaction
+and context limit in both model tests and record any truncation. Model input will
+not contain case IDs or ground-truth labels.
 
-### Scoring and annotation
+### Scoring and labels
 
-Report TP, FP, TN, FN, precision = TP/(TP+FP), recall = TP/(TP+FN), F1,
-FPR = FP/(FP+TN), and FNR = FN/(FN+TP). Undefined ratios remain undefined.
-Report candidate-generation recall separately: an LLM cannot recover an omitted
-candidate. Full-set scores include extraction misses; conditional scores cover
-only discovered candidates. Missing predictions and explicit abstentions count as
-negative in the current binary scoring convention, with their counts reported
-separately. Invalid model output fails the run and is logged; it is not silently
-converted into a successful negative prediction.
+We will report TP, FP, TN, FN, precision, recall, F1, false positive rate, and false
+negative rate. We will also report candidate recall because the LLM cannot classify
+a candidate that KeyTrace never finds. Full-set scores include missed candidates.
+Conditional scores include only cases where KeyTrace found a candidate. The scorer
+counts missing predictions and abstentions as negative decisions, and reports both
+counts separately. Invalid model output stops the run and appears in the log.
 
-CredData's detection labels can include credentials in tests. Preserve those labels
-rather than automatically declaring all test code negative. The present model prompt
-instructs the model to reject test/example values; revise that rule before CredData
-experiments to distinguish explicit dummy values from credentials merely located
-in tests. This protocol correction is pending, and no model results are claimed.
+CredData may label credentials in test code as positive. We will keep those labels.
+The current model prompt rejects all test and example values, so we must revise it
+before the CredData experiment. The new wording should reject clear dummy values
+without rejecting a credential only because it appears in a test.
 
-Intended-use annotation will use `authentication`, `api_token`, `database`,
-`cryptographic_key`, `test_example`, `non_secret`, and `unknown`. Prefer a specific
-supported use (database or cryptographic key) over generic authentication; use
-`api_token` for explicit API-key/token roles, and `authentication` otherwise.
-Document multiple uses and select the primary demonstrated use; unresolved cases
-remain unknown. Two teammates will independently label purpose and flow structure,
-without seeing system predictions, then adjudicate disagreements and retain the
-original labels and agreement counts. CredData detection labels remain unchanged.
+Purpose labels use `authentication`, `api_token`, `database`, `cryptographic_key`,
+`test_example`, `non_secret`, and `unknown`. We will choose the most specific use
+shown in the source. Two teammates will label purpose and flow without seeing system
+predictions. They will compare their labels, resolve disagreements, and record the
+original labels and agreement counts. We will not change CredData detection labels.
 
 ## 3. RQ1: How are sensitive credentials represented and propagated through source code?
 
 ### Complete method
 
-Characterize source representation, propagation, and sensitive use separately.
-Representation categories will include direct string/bytes literal, container or
-configuration literal, concatenation/formatting, and runtime/environment-derived
-value. Propagation tags will include assignment/alias, container access, argument
-passing, return value, and object attribute. Sink tags will include HTTP
-authentication/API access, database authentication, and cryptographic use. Tags may
-overlap, so their percentages need not sum to 100%.
+We will label three parts of each case. Representation labels will cover direct
+string or byte literals, container or configuration values, joined or formatted
+strings, and runtime or environment values. Flow labels will cover assignments,
+aliases, container access, function arguments, returns, and object attributes. Use
+labels will cover HTTP authentication, API access, database login, and cryptographic
+operations. A case may have more than one label.
 
-Manually annotate every eligible case in the frozen held-out set using the two-reviewer
-procedure. For environment-derived values, record the pattern but do not label the
-environment-variable name as a hardcoded secret. Such values are currently outside
-the detector's hardcoded-literal target and will be reported as a coverage limitation.
-
-Compare recovered traces with reviewed source-to-use paths. Report representation
-and propagation counts, candidate-generation recall, proportion of labeled locations
-with a recovered sensitive use, and warning frequency. Separate genuinely unused
-values from cases with unsupported or ambiguous paths; absence of an analyzer trace
-alone does not demonstrate absence of a use. Review unmatched or incorrect traces
-and summarize their failure categories. Report counts by repository as well as pooled.
+Two teammates will review every held-out case. They will record environment-based
+patterns but will not treat an environment variable name as a hardcoded secret.
+They will compare reviewed source paths with KeyTrace traces. We will report label
+counts, candidate recall, recovered sensitive uses, warnings, and results by
+repository. We will also separate truly unused values from flows that KeyTrace could
+not follow and review wrong or missing traces by error type.
 
 ### Results so far
 
-The analyzer handles assignments/reassignment, same-module parameter and return
-flows, selected container and string operations, recognized unittest setup/helpers,
-and selected HTTP/OAuth, SSH, database, and HMAC operations. All 62 regression tests
-pass. It discovers candidates at all 11 synthetic positive locations and 102/137
-CredData positive locations (74.5%). On the CredData pilot, the flow policy identifies
-17 labeled locations: 9 positives and 8 negatives. These are recovered sensitive-use
-locations, not 17 proven live credentials. A complete manually adjudicated frequency
-study of representation and propagation patterns has not yet been performed.
+The analyzer handles assignments, reassignments, same-module arguments and returns,
+selected containers and string operations, recognized unittest setup and helpers,
+and selected HTTP, OAuth, SSH, database, and HMAC calls. All 62 regression tests
+pass. KeyTrace finds candidates at all 11 synthetic positive locations and 102 of
+137 CredData positive locations, or 74.5%. On CredData, the flow policy marks 17
+labeled locations positive. Nine are labeled positive and eight are labeled negative.
+The team has not yet completed the manual count of representation and flow patterns.
 
-## 4. RQ2: To what extent does source-code context and program-flow information improve the precision and recall of automated secret detection?
+## 4. RQ2: To what extent does source code context and program flow improve precision and recall?
 
 ### Complete method
 
-Run Gitleaks and TruffleHog as traditional-tool reference conditions, then compare
-context-only and context-plus-flow LLM classification. The main controlled comparison
-is the paired context/hybrid ablation described in Section 2; comparisons against
-other tools provide context but cannot by themselves isolate the effect of flow.
-Include both implemented static policies as additional reference conditions.
+We will run Gitleaks and TruffleHog as reference tools. We will then compare LLM
+classification with context alone against classification with context plus KeyTrace
+flows. Both LLM tests will use the same candidate pool, model, prompt, redaction,
+and settings. This comparison will show whether the added flow changes results. The
+flow and evidence policies will provide two more static reference points.
 
-For each model condition, evaluate the same candidate pool and report both full-set
-and conditional precision, recall, F1, FPR, FNR, and abstention rate. Tabulate paired
-outcomes: errors corrected by hybrid and errors introduced by hybrid. Stratify results
-by whether a flow was available, repository, and annotated representation. Across
-three repetitions, report mean and range; also report per-repository differences.
-With few repositories, avoid broad statistical-generalization claims. Any expanded
-candidate extractor will be evaluated as a separate experiment, not silently mixed
-into one model condition.
+For each model test, we will report full-set and conditional precision, recall, F1,
+false positive rate, false negative rate, and abstentions. We will count cases that
+the hybrid test fixes and cases that it makes worse. We will also break results down
+by flow availability, repository, and representation type. For the three repeated
+runs, we will report the mean and range. If we change candidate extraction, we will
+report it as a separate experiment.
 
 ### Results so far
 
-Only static reference conditions have been evaluated. On the CredData pilot, flow
-scoring achieves 52.9% precision and 6.6% recall. Evidence scoring achieves 68.5%
-precision and 74.5% recall, but increases false positives from 8 to 47. The policy
-change captures many unused or untraced credential-like literals. It is not evidence
-that adding flow or an LLM improves classification. Context/hybrid results are pending.
+Only the static policies have results. On CredData, the flow policy reaches 52.9%
+precision and 6.6% recall. The evidence policy reaches 68.5% precision and 74.5%
+recall, but false positives rise from 8 to 47. The evidence policy finds many
+credential-like literals that lack a recovered flow. These numbers do not show that
+flow or an LLM improves classification. The context and hybrid tests remain pending.
 
-## 5. RQ3: How accurately can the intended use of a potential credential be inferred from source-code context?
+## 5. RQ3: How accurately can source code context identify a credential's intended use?
 
 ### Complete method
 
-Use the independently adjudicated purpose labels and taxonomy in Section 2.
-Classify the same candidates using source context alone and source context plus flow,
-with identical model settings and redaction. Compare against a static inferred-purpose
-reference based on supported sinks and literal evidence.
+We will use the reviewed purpose labels from Section 2. The same model will classify
+each candidate with context alone and with context plus flow. Both tests will use the
+same settings and redaction. We will compare them with the purpose that KeyTrace
+infers from supported uses and literal evidence.
 
-Report purpose accuracy, labeled-case denominator, per-category precision/recall,
-and a confusion matrix. Report unknown predictions and abstentions separately.
-Provide full-set accuracy (including extraction misses as unknown predictions) and
-accuracy conditional on candidate discovery. Report performance on all purpose-labeled
-cases and separately on detection-positive cases so that numerous non-secret examples
-do not conceal errors in credential-use inference. Purpose categories are not equivalent
-to secret/non-secret labels: a value's role does not establish whether it is genuine.
+We will report purpose accuracy, the number of labeled cases, results for each
+purpose, and a confusion matrix. We will list unknown answers and abstentions. We
+will report accuracy for the full set and for candidates that KeyTrace found. We
+will also report results for all labeled cases and for positive credentials alone.
+A correct use label does not prove that a credential is real.
 
 ### Results so far
 
-Static evidence scoring matches the synthetic purpose labels on 17/20 cases (85%);
-flow scoring matches 10/20 (50%). These are development fixtures designed around
-supported behaviors, not independent evidence of real-code purpose accuracy.
-CredData purpose labels are not yet annotated and are deliberately excluded from
-purpose scoring. No LLM intended-use results are available. Per-category metrics and
-the proposed reviewed held-out annotations remain to be completed.
+The evidence policy matches 17 of 20 synthetic purpose labels, or 85%. The flow
+policy matches 10 of 20, or 50%. The synthetic cases test supported behavior and do
+not measure performance on new repositories. CredData does not yet have reviewed
+purpose labels, so the evaluator leaves those cases out of purpose scoring. No LLM
+purpose results are available.
 
-## 6. RQ4: How does a hybrid static-analysis and LLM approach compare with existing secret scanners?
+## 6. RQ4: How does the hybrid approach compare with existing secret scanners?
 
 ### Complete method
 
-Compare Gitleaks, TruffleHog, KeyTrace flow, KeyTrace evidence, context-only LLM,
-and hybrid LLM on identical frozen source snapshots and labels. Pin tool versions
-and configurations, record scan failures and exclusions, and disable online credential
-verification. Normalize baseline locations using the existing importers; audit unmatched
-findings before interpreting results. Tool-native candidate discovery remains part
-of each end-to-end system, unlike RQ2's fixed-pool model ablation.
+We will compare Gitleaks, TruffleHog, KeyTrace flow, KeyTrace evidence, the context
+LLM, and the hybrid LLM on the same files and labels. We will record tool versions,
+settings, failures, and exclusions, and turn off online credential checks. The
+existing importers will match baseline findings to labeled lines. We will review
+unmatched findings before drawing conclusions.
 
-Report full-set detection metrics, per-repository results, and error categories.
-Measure wall-clock time on the same machine, separating model startup from warm
-inference and including candidate extraction in total pipeline time. Report median
-and range over three runs, hardware, and available token counts. Local inference
-has no hosted API charge, but runtime and resource use must still be reported.
-Do not compare baseline tools on purpose labels they do not produce. Use reviewed
-error examples to explain complementary strengths and weaknesses rather than
-claiming universal superiority from pooled scores.
+We will report full-set detection scores, results by repository, and common error
+types. We will time three runs on the same computer. Timing will separate model
+startup from later requests and will include candidate extraction. We will report
+the median, range, hardware, and token counts. Gitleaks and TruffleHog do not predict
+purpose, so we will compare them only on secret detection.
 
 ### Results so far
 
-Gitleaks and TruffleHog output normalization and the model adapter protocol have
-unit coverage. Actual baseline tools and the local LLM have not been run in this
-workspace; no cross-tool ranking or hybrid improvement is established. The static
-results in Appendix A provide the initial reference conditions for this comparison.
+Tests cover the Gitleaks and TruffleHog importers and the model adapter format. The
+team has not run the real baseline tools or local LLM in this workspace. We therefore
+have no cross-tool ranking or evidence that the hybrid method improves results.
+Appendix A lists the current static results.
 
-## 7. Deviations from the initial plan
+## 7. Changes from the initial plan
 
-| Original plan | Current change and reason |
+| Original plan | Change and reason |
 |---|---|
-| SecretBench was a candidate benchmark. | Used an available obfuscated CredData Python pilot plus controlled synthetic fixtures to develop a reproducible local pipeline. SecretBench was not required by the proposal, and no SecretBench results are claimed. |
-| Baseline setup/runs scheduled September 21–October 4. | No completed baseline runs are recorded here. Work prioritized dataset preparation, static implementation, and offline scoring. Baselines are rescheduled before full experiments; teammates must confirm whether separate results exist. |
-| Static source-to-use tracing as the primary implemented signal. | Added explicit unittest entry points after module-only analysis recovered no labeled pilot flows; many relevant paths reside in tests. The entry-point assumption is now recorded in reports. |
-| Compare traditional, context-aware, and flow-aware approaches. | Added a literal-evidence static comparator after the flow-only policy missed many positives. This improves coverage but introduces more false alarms and does not replace the planned LLM ablation. |
-| Small declaration/flow/sink slices for the LLM. | Current requests use redacted overlapping top-level statements with a 12,000-character cap. This simplifies initial export but may remove useful literal evidence or truncate context; controlled model evaluation remains pending. |
-| Examine environment and dynamically constructed credentials. | Current detection targets hardcoded Python literals and bounded supported flows. Environment patterns will be characterized as a coverage limitation rather than reported as detected hardcoded values. |
+| Consider SecretBench as a benchmark | We used an available obfuscated CredData Python pilot and synthetic cases to build the local pipeline. The proposal did not require SecretBench, and this report makes no SecretBench claims. |
+| Run baseline tools from September 21 to October 4 | The team first prepared data, built the scanner, and added offline scoring. Baseline runs now come before the full experiment. Teammates still need to confirm whether they ran separate baselines. |
+| Use source to use tracing as the main signal | Module-only analysis found no labeled CredData flows, so we added explicit unittest entry points. Reports now record that setting. |
+| Compare traditional, context, and flow approaches | We added the evidence policy after flow-only scoring missed many positives. It improves recall but also adds false positives. It does not replace the planned LLM comparison. |
+| Send small code slices to the LLM | Current requests send redacted top-level statements with a 12,000 character limit. This was simpler to build, but it may hide values or cut off context. We still need to test it. |
+| Examine environment and generated credentials | Current detection focuses on hardcoded Python literals and supported flows. We will report environment patterns as a limitation. |
 
 ## 8. Remaining schedule
 
-Owners below are proposed assignments carried forward from the original proposal,
-not claims of completed individual contributions. The team should confirm them.
-The intermediate deadline of October 14 and final deadline of November 30 are
-based on the team's supplied schedule.
+The owners below come from the original proposal. The team still needs to confirm
+them and record each member's completed work. The schedule uses the team's reported
+October 14 intermediate deadline and November 30 final deadline.
 
-| Dates (2026) | Task and concrete deliverable | Primary / support |
+| Dates in 2026 | Task and output | Primary and support |
 |---|---|---|
-| Oct 11–14 | Review this report, verify artifact logs and dataset access, confirm individual contributions, and submit the intermediate package. | Rogelio / Liam |
-| Oct 15–18 | Complete pinned baseline runs on development data; audit normalized/unmatched findings. Define annotation guide and freeze held-out repository selection. | Colin / Rogelio |
-| Oct 19–25 | Implement local adapter; run a small feasibility pilot; freeze model/settings and correct prompt label policy and warning controls. | Cooper / Vansh |
-| Oct 26–Nov 1 | Integrate hybrid pipeline, complete independent annotations/adjudication, freeze experiments, and prepare scheduled presentation material. | Vansh / Colin; Liam and Rogelio annotate |
-| Nov 2–8 | Run all frozen conditions on held-out data; retain predictions, failures, version records, and runtime logs. | Colin / Liam |
-| Nov 9–15 | Complete repeated runs, paired comparisons, purpose confusion matrices, and per-repository summaries. | Vansh / Cooper |
-| Nov 16–22 | Review errors and limitations; write findings for each RQ without tuning on held-out results. | Rogelio / Colin |
-| Nov 23–29 | Complete final report, figures, reproducibility package, and presentation. | Cooper / Liam |
-| Nov 30 | Final review and report submission; confirm course deadline. | Liam / Cooper |
-| Dec 1–4 | Final presentation preparation/delivery according to assigned course slot. | Entire team |
+| Oct 11 to 14 | Review the report, verify logs and dataset access, confirm contributions, and submit the intermediate package | Rogelio and Liam |
+| Oct 15 to 18 | Run pinned baseline tools on development data, review unmatched findings, write the annotation guide, and choose held-out repositories | Colin and Rogelio |
+| Oct 19 to 25 | Build the local adapter, run a small pilot, choose the model and settings, and fix the prompt and warning controls | Cooper and Vansh |
+| Oct 26 to Nov 1 | Connect the hybrid pipeline, finish annotation and review, lock the experiment, and prepare presentation material | Vansh and Colin, with Liam and Rogelio annotating |
+| Nov 2 to 8 | Run every condition on held-out data and save predictions, failures, versions, and timing logs | Colin and Liam |
+| Nov 9 to 15 | Finish repeat runs, paired comparisons, purpose confusion matrices, and repository summaries | Vansh and Cooper |
+| Nov 16 to 22 | Review errors and limitations and write findings for each RQ | Rogelio and Colin |
+| Nov 23 to 29 | Finish the final report, figures, reproducibility package, and presentation | Cooper and Liam |
+| Nov 30 | Review and submit the final report after confirming the deadline | Liam and Cooper |
+| Dec 1 to 4 | Prepare and give the final presentation | Entire team |
 
-If local inference is too slow, reduce the development model or evaluation workload
-before freezing the experiment, disclose the change, and keep comparisons paired.
-Do not silently omit failed runs or replace the held-out set after seeing outcomes.
+If local inference runs too slowly, we will reduce the development model or workload
+before we lock the final experiment. We will report that change and keep both LLM
+tests matched. We will also keep failed runs and avoid changing the held-out set
+after seeing results.
 
-## Appendix A. Detailed preliminary results
+## Appendix A. Preliminary results
 
-All rows below use `--entry-points tests` and the same current implementation.
+All rows use `--entry-points tests` and the same code version.
 
-| Dataset / policy | N | TP | FP | TN | FN | Precision | Recall | F1 | Abstentions |
+| Dataset and policy | N | TP | FP | TN | FN | Precision | Recall | F1 | Abstentions |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| Synthetic / flow | 20 | 10 | 2 | 7 | 1 | 83.3% | 90.9% | 87.0% | 0 |
-| Synthetic / evidence | 20 | 11 | 1 | 8 | 0 | 91.7% | 100% | 95.7% | 1 |
-| CredData / flow | 423 | 9 | 8 | 278 | 128 | 52.9% | 6.6% | 11.7% | 0 |
-| CredData / evidence | 423 | 102 | 47 | 239 | 35 | 68.5% | 74.5% | 71.3% | 13 |
+| Synthetic flow | 20 | 10 | 2 | 7 | 1 | 83.3% | 90.9% | 87.0% | 0 |
+| Synthetic evidence | 20 | 11 | 1 | 8 | 0 | 91.7% | 100% | 95.7% | 1 |
+| CredData flow | 423 | 9 | 8 | 278 | 128 | 52.9% | 6.6% | 11.7% | 0 |
+| CredData evidence | 423 | 102 | 47 | 239 | 35 | 68.5% | 74.5% | 71.3% | 13 |
 
-Evidence-policy FPR/FNR are 11.1%/0% on synthetic and 16.4%/25.5% on CredData.
-Abstentions count as negative decisions in this table. Full confusion information,
-case-level predictions, warnings, dataset fingerprints, and test output are in the
-separate supporting files. These datasets were used for development; none of the
-numbers establish held-out performance or the project's LLM hypothesis.
+The evidence policy has an 11.1% false positive rate and 0% false negative rate on
+the synthetic data. On CredData, those rates are 16.4% and 25.5%. The scorer counts
+abstentions as negative decisions. Separate files contain the full predictions,
+warnings, dataset fingerprints, and test output. Both datasets supported development,
+so these results do not measure held-out performance or prove the LLM hypothesis.
 
-## Appendix B. Separate supporting artifacts
+## Appendix B. Separate code, data, and logs
 
-The codebase, datasets, and logs are submitted separately from this report, as
-required. `docs/ARTIFACTS.md` contains the detailed inventory and reproduction
-command.
+The course submission should include these items separately from the report.
+`docs/ARTIFACTS.md` lists the files and reproduction command.
 
-| Artifact | Contents | Delivery location |
+| Item | Contents | Location |
 |---|---|---|
-| Codebase | Scanner, detection and classification modules, evaluation tools, regression tests, README, and experiment documentation | Version-controlled repository |
-| Synthetic dataset | 20 invented Python fixtures and their manifest | `datasets/synthetic/` in the repository |
-| CredData pilot | Prepared obfuscated sources, manifest, metadata, licenses, exclusions, and provenance | Separate retained `datasets/creddata/` package |
-| Evaluation results and logs | Four evaluation JSON reports, summary, verbose test log, run metadata, dataset fingerprints, and source hashes | Separate retained `output/intermediate/` package |
-| Reproduction workflow | Script and commands that regenerate the result package | `evaluation/capture.py` and `docs/ARTIFACTS.md` |
+| Code | Scanner, detection and classification modules, evaluation tools, tests, README, and experiment documentation | Version-controlled repository |
+| Synthetic data | 20 invented Python cases and their manifest | `datasets/synthetic/` in the repository |
+| CredData pilot | Obfuscated sources, manifest, metadata, licenses, exclusions, and provenance | Separate `datasets/creddata/` package |
+| Results and logs | Four evaluation reports, summary, test log, run metadata, dataset fingerprints, and source hashes | Separate `output/intermediate/` package |
+| Reproduction files | Script and instructions that rebuild the result package | `evaluation/capture.py` and `docs/ARTIFACTS.md` |
 
-The prepared CredData material and generated output are intentionally ignored by
-Git, so a repository-only hand-in is incomplete. They are not present in the fresh
-clone used for this review and must be copied from the team's retained package or
-regenerated before submission. Dataset licensing and course-delivery restrictions
-still apply; the data should not be made public merely to make the Git repository
-self-contained.
+Git ignores the CredData and generated output folders. This fresh clone does not
+contain them. The team must copy them from its saved package or regenerate them
+before submission. The team should follow the dataset license and course delivery
+rules instead of publishing the data in the public repository.
 
-## Sources and provenance
+## Sources
 
-- Team proposal: *Keytrace Proposal CSE467.pdf*, supplied by the team; research
-  questions and original work allocation are retained here.
-- Local implementation and experimental records: this repository and the separate
-  `output/intermediate/` artifacts regenerated for this draft.
-- CredData upstream: https://github.com/Samsung/CredData, revision
-  `0b1940e171725ad8937311120b191602608a4801`; local provenance and licenses retained.
+- *Keytrace Proposal CSE467.pdf*, supplied by the team
+- This repository and its separate `output/intermediate/` records
+- CredData revision `0b1940e171725ad8937311120b191602608a4801` from
+  https://github.com/Samsung/CredData
 
-Literature citations from the proposal should be bibliographically verified before
-being reused in the final report. This draft makes no new literature-result claims.
+The team should verify proposal references before using them in the final report.

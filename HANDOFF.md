@@ -98,8 +98,10 @@ for every RQ, results so far per RQ, deviations, a remaining schedule, and separ
 code/data/log artifacts. The draft includes every section without inventing a
 model result. An October 21 audit now states the supported “at least 30%” milestone
 explicitly, maps each requested item to the report, and adds a concrete inventory
-of the separately delivered code, data, and logs. Owners are proposed from the
-original proposal; team contributions and any independent baseline runs need confirmation.
+of the separately delivered code, data, and logs. A plain-language revision removed
+repeated caveats, dense research jargon, em dashes, arrows, and semicolons while
+keeping all methods and results. Owners are proposed from the original proposal;
+team contributions and any independent baseline runs need confirmation.
 The fresh remote clone does not contain the ignored `datasets/creddata/` or
 `output/intermediate/` packages; restore or regenerate them before submission.
 Reported deadlines: October 14 intermediate and November 30 final; confirm with course.
