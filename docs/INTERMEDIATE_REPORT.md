@@ -6,7 +6,7 @@
 
 ## 1. Objective and progress
 
-KeyTrace investigates whether source-code context and static program-flow evidence
+KeyTrace investigates whether source code context and static program flow evidence
 can improve secret detection and inference of a credential's intended use. The
 prototype parses Python without executing it, extracts candidate literals, traces
 supported source-to-use paths, and produces redacted findings. A planned LLM stage
@@ -14,12 +14,11 @@ will classify candidates using source context with and without flow information.
 
 Completed work includes a working static analyzer, two static decision policies,
 20 synthetic development cases, a 423-case obfuscated CredData Python pilot, an
-evaluation pipeline, model request/response interfaces, baseline-output importers,
+evaluation pipeline, model request/response interfaces, baseline output importers,
 and 62 passing regression tests. The project has progressed beyond design to an
 implemented and evaluated subsystem. Based on these completed deliverables, the
-project has completed **at least 30% of the planned work**. This is a milestone
-assessment supported by working code, development-data results, and automated
-tests—not a claim that 30% of the research hypothesis has been proven. Actual LLM
+project has completed **at least 30% of the planned work**. This is supported by working code, development-data results, and automated
+tests, not a claim that 30% of the research hypothesis has been proven. Actual LLM
 inference, external scanner runs, and held-out experiments remain outstanding.
 
 The current pipeline is:
@@ -60,19 +59,19 @@ labels, 30 were excluded for multiple candidates on a line and six for multiline
 candidates. Exclusions were established during import, not according to detection
 success. Synthetic positive values are invented and invalid; they simulate roles.
 
-A case is a labeled source-file/line location. Multiple extracted candidates at
-that location are aggregated to a single prediction. This is line-level evaluation,
-not a general span-level benchmark. Unmatched external-tool findings will be listed
+A case is a labeled source file/line location. Multiple extracted candidates at
+that location are aggregated to a single prediction. This is line level evaluation,
+not a general span level benchmark. Unmatched external tool findings will be listed
 for review, not automatically counted as false positives. Detection rates apply
 to labeled candidates, not every line of code in the repositories.
 
-For final evaluation, we plan a separate, repository-disjoint CredData Python set,
+For final evaluation, we plan a separate, repository disjoint CredData Python set,
 targeting at least three additional repositories and 200 eligible cases, including
 at least 50 positives and 50 negatives if available. Selection will use language,
 label availability, and repository identity, never scanner success. Record any
 shortfall rather than adjusting the selection after inspecting results. Deduplicate
-source hashes and near-identical fixtures across splits. Freeze the manifests,
-exclusions, implementation, prompts, and configurations before inspecting held-out
+source hashes and near identical fixtures across splits. Freeze the manifests,
+exclusions, implementation, prompts, and configurations before inspecting held out
 predictions. Current pilot cases will remain development-only.
 
 ### Analysis conditions and controls
@@ -84,7 +83,7 @@ will be a separate sensitivity analysis. Unsupported imports, cross-file calls,
 dynamic behavior, and incomplete object analysis can prevent flow recovery.
 
 The planned model will run locally through an Ollama adapter. Select the exact
-model artifact using development-only feasibility tests, then record its digest,
+model artifact using development only feasibility tests, then record its digest,
 quantization, prompt version, context limit, generation settings, and hardware.
 Use temperature zero where supported and three repeated context/hybrid runs to
 measure residual variability. Model selection and adapter implementation are pending.
@@ -97,7 +96,7 @@ implemented before final experiments. Do not interpret the current exporter as a
 completed controlled ablation.
 
 The exporter masks string/bytes contents and removes comments; identifiers and paths
-remain visible. Context includes overlapping top-level statements, capped at 12,000
+remain visible. Context includes overlapping top level statements, capped at 12,000
 characters, rather than a minimal program slice. Use the same redaction and context
 budget in both conditions and record truncation. This experiment evaluates reasoning
 from redacted context, not a model's ability to validate original token contents.
