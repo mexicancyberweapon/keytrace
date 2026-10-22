@@ -1,6 +1,6 @@
 # KeyTrace handoff
 
-Updated October 11, 2026. Keep this file focused on current state and next steps;
+Updated October 21, 2026. Keep this file focused on current state and next steps;
 historical results belong in [PROJECT.md](docs/PROJECT.md).
 
 ## Goal and working preferences
@@ -96,8 +96,12 @@ Higher evidence recall comes with more false alarms than the flow-only policy.
 The instructor requires evidence of at least 30% completed work, complete methods
 for every RQ, results so far per RQ, deviations, a remaining schedule, and separate
 code/data/log artifacts. The draft includes every section without inventing a
-completion percentage or model results. Owners are proposed from the original
-proposal; team contributions and any independent baseline runs need confirmation.
+model result. An October 21 audit now states the supported “at least 30%” milestone
+explicitly, maps each requested item to the report, and adds a concrete inventory
+of the separately delivered code, data, and logs. Owners are proposed from the
+original proposal; team contributions and any independent baseline runs need confirmation.
+The fresh remote clone does not contain the ignored `datasets/creddata/` or
+`output/intermediate/` packages; restore or regenerate them before submission.
 Reported deadlines: October 14 intermediate and November 30 final; confirm with course.
 
 1. Review the draft with teammates, confirm owners/contributions and submission

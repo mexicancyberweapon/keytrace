@@ -16,21 +16,37 @@ Completed work includes a working static analyzer, two static decision policies,
 20 synthetic development cases, a 423-case obfuscated CredData Python pilot, an
 evaluation pipeline, model request/response interfaces, baseline-output importers,
 and 62 passing regression tests. The project has progressed beyond design to an
-implemented and evaluated subsystem. These artifacts provide evidence toward the
-required 30% completion milestone; we do not assign an unsupported numerical
-completion percentage. Actual LLM inference, external scanner runs, and held-out
-experiments remain outstanding in this workspace.
+implemented and evaluated subsystem. Based on these completed deliverables, the
+project has completed **at least 30% of the planned work**. This is a milestone
+assessment supported by working code, development-data results, and automated
+tests—not a claim that 30% of the research hypothesis has been proven. Actual LLM
+inference, external scanner runs, and held-out experiments remain outstanding.
 
 The current pipeline is:
 
 **Python source → candidate extraction → bounded static analysis → static
 assessment or planned LLM classification → evaluation against labels.**
 
+Evidence for the intermediate milestone is summarized below.
+
+| Work area | Completed evidence |
+|---|---|
+| Core implementation | Python candidate extraction, bounded source-to-use tracing, redacted reporting, and two static decision policies |
+| Data and evaluation | Synthetic development manifest, prepared CredData pilot, scoring pipeline, model request/response contract, and baseline-output normalization |
+| Validation | 62 passing regression tests and recorded preliminary synthetic and CredData metrics |
+| Work still pending | Local-model execution, real Gitleaks/TruffleHog runs, independent held-out evaluation, error analysis, and final reporting |
+
 The two implemented static policies are: (1) **flow**, which predicts a secret when
 a candidate reaches a supported sensitive argument; and (2) **evidence**, which
 assesses credential-like literal contents and names independently of reachability,
 suppresses explicit placeholders/examples, and abstains on ambiguous metadata or
 resource references. A sensitive use is not proof that a credential is live.
+
+The rest of this report maps directly to the requested deliverable: Section 2
+defines the shared experimental design; Sections 3–6 give a complete method and
+results so far for every research question; Section 7 records deviations from the
+initial plan; Section 8 schedules the remaining work; and Appendix B inventories
+the separately delivered codebase, datasets, and logs.
 
 ## 2. Shared experimental design
 
@@ -282,12 +298,24 @@ numbers establish held-out performance or the project's LLM hypothesis.
 
 ## Appendix B. Separate supporting artifacts
 
-See `docs/ARTIFACTS.md` for the artifact inventory and reproduction
-command. The package retains four evaluation JSON reports, a summary, test output,
-run metadata with source hashes, and a reproduction script. The codebase and retained
-datasets remain separate from this report document. Prepared CredData sources,
-metadata, licenses, import exclusions, and provenance are under `datasets/creddata/`;
-they are ignored by Git and must not be assumed present in a repository-only hand-in.
+The codebase, datasets, and logs are submitted separately from this report, as
+required. `docs/ARTIFACTS.md` contains the detailed inventory and reproduction
+command.
+
+| Artifact | Contents | Delivery location |
+|---|---|---|
+| Codebase | Scanner, detection and classification modules, evaluation tools, regression tests, README, and experiment documentation | Version-controlled repository |
+| Synthetic dataset | 20 invented Python fixtures and their manifest | `datasets/synthetic/` in the repository |
+| CredData pilot | Prepared obfuscated sources, manifest, metadata, licenses, exclusions, and provenance | Separate retained `datasets/creddata/` package |
+| Evaluation results and logs | Four evaluation JSON reports, summary, verbose test log, run metadata, dataset fingerprints, and source hashes | Separate retained `output/intermediate/` package |
+| Reproduction workflow | Script and commands that regenerate the result package | `evaluation/capture.py` and `docs/ARTIFACTS.md` |
+
+The prepared CredData material and generated output are intentionally ignored by
+Git, so a repository-only hand-in is incomplete. They are not present in the fresh
+clone used for this review and must be copied from the team's retained package or
+regenerated before submission. Dataset licensing and course-delivery restrictions
+still apply; the data should not be made public merely to make the Git repository
+self-contained.
 
 ## Sources and provenance
 
